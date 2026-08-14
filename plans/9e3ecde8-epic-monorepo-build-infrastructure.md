@@ -13,23 +13,51 @@ monorepo producing a sideloaded Android APK — no app stores, no iOS.
 **Done when:** `yarn android` produces a working APK, i18n renders both locales
 (EN/ES), and shared types are importable across the codebase.
 
+## Decisions (resolved with the requester)
+
+All nine open questions from the previous round were answered; every
+recommendation was accepted. The plan below treats these as fixed:
+
+1. **App topology:** one RN app, `apps/doorman`, with role-based entry
+   (client/master mode chosen at pairing/setup). The `apps/*` layout keeps a
+   later split cheap.
+2. **RN flavor:** bare React Native via the community CLI (no Expo) — kiosk
+   mode, vision-camera frame processors, and Tesseract need unrestricted
+   native access; we ship a plain sideloaded APK.
+3. **Package manager:** modern Yarn 4 (berry) with `nodeLinker: node-modules`.
+4. **RN version:** pin the latest stable exactly at implementation time; hold
+   it for the epic, upgrade deliberately.
+5. **`minSdkVersion`:** RN template default (API 24 / Android 7).
+6. **Naming:** Android `applicationId` = `com.virtualdoorman`; workspace
+   packages under the `@virtualdoorman/*` scope.
+7. **Release signing:** generate one dedicated keystore now, stored outside
+   the repo (developer machine / secret store), documented in README —
+   sideload updates require consistent signing.
+8. **CI:** GitHub Actions workflow for lint + typecheck + test now; APK-build
+   CI deferred.
+9. **Env split:** `react-native-config` `.env` files mapped to build types.
+
 ## Approach
 
-Yarn-workspaces monorepo (the spec's `yarn android` acceptance criterion fixes
-yarn as the package manager) with an `apps/` + `packages/` split:
+Yarn-workspaces monorepo (Yarn 4, `nodeLinker: node-modules`) with an
+`apps/` + `packages/` split:
 
 ```
 /
-├── package.json                  # workspace root: workspaces, shared scripts
+├── package.json                  # workspace root: workspaces, packageManager pin, shared scripts
+├── .yarnrc.yml                   # nodeLinker: node-modules
 ├── .nvmrc                        # Node LTS pin
-├── .gitignore                    # node_modules, android build output, .env files, keystores
+├── .gitignore                    # node_modules, .yarn cache dirs, android build output, .env.local, keystores
+├── .github/
+│   └── workflows/
+│       └── ci.yml                # lint + typecheck + test on PR/push
 ├── tsconfig.base.json            # strict-mode base config, path aliases
 ├── .eslintrc.js                  # extends @react-native/eslint-config + prettier
 ├── .prettierrc.js
 ├── README.md                     # rewritten: overview, APK build + sideload instructions
 ├── plans/                        # this file
 ├── apps/
-│   └── doorman/                  # the React Native app (bare RN CLI, TypeScript)
+│   └── doorman/                  # the single React Native app (bare RN CLI, TypeScript)
 │       ├── package.json          # name: @virtualdoorman/app
 │       ├── android/              # Gradle project from the RN template, APK-tuned
 │       ├── metro.config.js       # monorepo-aware (watchFolders → repo root)
@@ -57,9 +85,15 @@ yarn as the package manager) with an `apps/` + `packages/` split:
             └── property.ts       # Property
 ```
 
-### 1. Workspace root
+### 1. Workspace root (Yarn 4)
 
-- `package.json`: `private: true`, `workspaces: ["apps/*", "packages/*"]`.
+- `package.json`: `private: true`, `workspaces: ["apps/*", "packages/*"]`,
+  `"packageManager": "yarn@4.x.y"` (exact version pinned at implementation
+  time; activated via corepack).
+- `.yarnrc.yml`: `nodeLinker: node-modules` — RN/Metro/Gradle tooling assumes
+  a real `node_modules` tree; no PnP, no zero-installs (Yarn cache dirs and
+  install state gitignored, only `.yarn/releases` committed if we vendor the
+  release — default is corepack, nothing vendored).
 - Root convenience scripts so the acceptance command works from the repo root:
   - `"android": "yarn workspace @virtualdoorman/app android"`
   - `"start"`, `"lint"`, `"typecheck"`, `"test"` fan out to workspaces.
@@ -68,9 +102,17 @@ yarn as the package manager) with an `apps/` + `packages/` split:
 ### 2. React Native app (`apps/doorman`)
 
 - Scaffold from the official React Native community CLI TypeScript template
-  (the template is TS by default), then move into `apps/doorman` and strip iOS
-  (`ios/` directory removed — Android-only, sideload target; keeps the repo and
-  CI surface small).
+  (the template is TS by default) at the **latest stable RN version, pinned
+  exactly** in `package.json` (no `^`/`~`) and held for the epic; then move
+  into `apps/doorman` and strip iOS (`ios/` directory removed — Android-only,
+  sideload target; keeps the repo and CI surface small).
+- Single app for both roles: this ticket only scaffolds a placeholder
+  `App.tsx`; the role-based entry (client kiosk vs. master admin, chosen at
+  pairing/setup) lands in the pairing ticket. A `// FUTURE:` comment in
+  `App.tsx` marks the branch point.
+- `android/app/build.gradle`: `applicationId "com.virtualdoorman"` (Java
+  package renamed from the template to match); `minSdkVersion` left at the RN
+  template default (API 24 / Android 7).
 - **Metro**: `watchFolders: [repoRoot]`, `resolver.nodeModulesPaths` covering
   both the app's and the root `node_modules`, so hoisted workspace deps and
   `@virtualdoorman/types` resolve. Types package is consumed as TS source via
@@ -82,6 +124,11 @@ yarn as the package manager) with an `apps/` + `packages/` split:
   - `release` build type: signing config read from `~/.gradle/gradle.properties`
     / env vars (keystore never committed); `./gradlew assembleRelease` produces
     the sideloadable APK. No AAB/bundle config — APK only.
+  - Keystore: one dedicated release keystore generated during implementation,
+    stored **outside the repo** on the owner's machine (with a backup in their
+    secret store); README documents generation (`keytool` one-liner), the
+    gradle property names, and why the same keystore must sign every sideload
+    update.
   - `abiFilters`/splits left at universal APK (single file to sideload).
 
 ### 3. TypeScript strict mode, ESLint, Prettier
@@ -151,12 +198,23 @@ Rewrite `README.md`:
   tablet, `adb install -r app-release.apk`, plus a placeholder section for the
   security ticket's hardening notes.
 
+### 8. CI (GitHub Actions)
+
+`.github/workflows/ci.yml`, triggered on pull requests and pushes to `dev`:
+
+- Single Ubuntu job: checkout → setup Node from `.nvmrc` with corepack/Yarn 4
+  cache → `yarn install --immutable` → `yarn lint` → `yarn typecheck` →
+  `yarn test`.
+- No Android SDK / APK build in CI (deferred per the requester's answer) —
+  keeps the workflow fast and dependency-free.
+
 ## Files to change
 
 All new files (repo currently contains only `README.md`, which is rewritten):
 
-- `package.json`, `.nvmrc`, `.gitignore`, `tsconfig.base.json`,
+- `package.json`, `.yarnrc.yml`, `.nvmrc`, `.gitignore`, `tsconfig.base.json`,
   `.eslintrc.js`, `.prettierrc.js`, `README.md`
+- `.github/workflows/ci.yml`
 - `apps/doorman/**` — RN TypeScript app as laid out above (template output
   minus `ios/`, plus `src/i18n/**`, `src/config/env.ts`, monorepo-aware
   `metro.config.js`, env-wired `android/app/build.gradle`)
@@ -180,6 +238,8 @@ Jest (from the RN template, jest-preset react-native) in `apps/doorman`:
 - `packages/types`: `yarn typecheck` (tsc --noEmit) is the test — no runtime
   code to unit test.
 
+CI runs `yarn lint`, `yarn typecheck`, and `yarn test` on every PR (section 8).
+
 Manual verification (documented in the PR):
 - `yarn android` against an emulator/device installs and launches the app.
 - `./gradlew assembleRelease` emits an installable APK.
@@ -188,17 +248,8 @@ Manual verification (documented in the PR):
 ## Out of scope (later tickets)
 
 Capture flow, camera/OCR deps, S3 client, offline queue, pairing/QR, kiosk
-mode, admin PIN, master phone screens. This ticket only guarantees the skeleton
-they plug into.
+mode, admin PIN, master phone screens, role-based entry implementation. This
+ticket only guarantees the skeleton they plug into.
 
-## Open questions
-
-- App topology: the tablet (guest capture) and the owner's phone (admin) are described in separate tickets — should this scaffold create one RN app that serves both roles (mode chosen at pairing/setup), or two apps (`apps/doorman-client`, `apps/doorman-master`) in the monorepo now? I recommend a single app (`apps/doorman`) with role-based entry, since "single codebase" and one APK to sideload keeps ops simplest; the `apps/*` layout leaves a later split cheap.
-- React Native flavor: bare React Native via the community CLI, or Expo (prebuild)? I recommend bare RN CLI — kiosk mode, vision-camera frame processors, and Tesseract need unrestricted native access and we ship a plain sideloaded APK.
-- Yarn version: classic v1 or modern Yarn (berry) with `nodeLinker: node-modules`? I recommend modern Yarn 4 with node-modules linker — current RN tooling assumes a node_modules tree, and Yarn 4 gives reliable workspace hoisting control.
-- React Native version pinning: pin the latest stable at implementation time and hold it for the epic, or track minors? I recommend pinning latest stable (exact version in package.json) and upgrading deliberately.
-- Android version floor for the wall tablets: which `minSdkVersion`? I recommend the RN template default (currently API 24 / Android 7) unless the target tablets are known to be older.
-- Application ID / package naming: `com.virtualdoorman` for the Android applicationId and `@virtualdoorman/*` for workspace packages? I recommend exactly that.
-- Release signing: who owns the release keystore, and where does it live (developer machine, shared secret store)? I recommend generating one dedicated keystore now, storing it outside the repo (documented in README), since sideload updates require consistent signing.
-- CI: is a GitHub Actions workflow (lint + typecheck + test, optionally debug-APK build) in scope for this ticket? I recommend adding the cheap lint/typecheck/test workflow now and deferring APK-build CI.
-- Environment split mechanism: `react-native-config` .env files mapped to build types, or a pure-TS env module switched on `__DEV__`/build type? I recommend react-native-config — later tickets (bucket defaults, log levels) get real per-env values without code changes.
+All previously open questions were answered by the requester and are recorded
+in the **Decisions** section above — none remain.
