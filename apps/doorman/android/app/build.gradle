@@ -1,0 +1,151 @@
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.facebook.react"
+
+// Resolved in settings.gradle: the node_modules folder that actually holds
+// react-native (the workspace root's, once Yarn hoists it).
+def nodeModulesDir = gradle.ext.nodeModulesDir
+
+/**
+ * Maps build types to the `.env` files react-native-config bakes into the APK.
+ * Must be set before dotenv.gradle is applied.
+ */
+project.ext.envConfigFiles = [
+    debug: ".env.development",
+    release: ".env.production",
+]
+apply from: new File(nodeModulesDir, "react-native-config/android/dotenv.gradle")
+
+/**
+ * This is the configuration block to customize your React Native Android app.
+ * Paths are pinned explicitly because this app lives in a Yarn workspace and
+ * its dependencies are hoisted to the repo root.
+ */
+react {
+    /* Folders */
+    //   The root of your project, i.e. where "package.json" lives.
+    root = file("../../")
+    //   The folder where the react-native NPM package is.
+    reactNativeDir = new File(nodeModulesDir, "react-native")
+    //   The folder where the react-native Codegen package is.
+    codegenDir = new File(nodeModulesDir, "@react-native/codegen")
+    //   The cli.js file which is the React Native CLI entrypoint.
+    cliFile = new File(nodeModulesDir, "react-native/cli.js")
+
+    /* Autolinking */
+    autolinkLibrariesWithApp()
+}
+
+/**
+ * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
+ */
+def enableProguardInReleaseBuilds = false
+
+/**
+ * The preferred build flavor of JavaScriptCore (JSC)
+ *
+ * For example, to use the international variant, you can use:
+ * `def jscFlavor = io.github.react-native-community:jsc-android-intl:2026004.+`
+ *
+ * The international variant includes ICU i18n library and necessary data
+ * allowing to use e.g. `Date.toLocaleString` and `String.localeCompare` that
+ * give correct results when using with locales other than en-US. Note that
+ * this variant is about 6MiB larger per architecture than default.
+ */
+def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
+
+/**
+ * Release signing. The keystore never lives in this repo: set these four
+ * properties in `~/.gradle/gradle.properties` (or as ORG_GRADLE_PROJECT_*
+ * environment variables) — see the README's "Release APK" section.
+ * Every sideloaded update must be signed with the same keystore.
+ */
+def releaseSigningProps = [
+    'VIRTUALDOORMAN_RELEASE_STORE_FILE',
+    'VIRTUALDOORMAN_RELEASE_STORE_PASSWORD',
+    'VIRTUALDOORMAN_RELEASE_KEY_ALIAS',
+    'VIRTUALDOORMAN_RELEASE_KEY_PASSWORD',
+]
+def hasReleaseSigning = releaseSigningProps.every { project.hasProperty(it) }
+
+android {
+    ndkVersion rootProject.ext.ndkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+    compileSdk rootProject.ext.compileSdkVersion
+
+    namespace "com.virtualdoorman"
+    buildFeatures {
+        // react-native-config writes the .env values into BuildConfig fields.
+        buildConfig true
+    }
+    defaultConfig {
+        applicationId "com.virtualdoorman"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+    }
+    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(project.property('VIRTUALDOORMAN_RELEASE_STORE_FILE'))
+                storePassword project.property('VIRTUALDOORMAN_RELEASE_STORE_PASSWORD')
+                keyAlias project.property('VIRTUALDOORMAN_RELEASE_KEY_ALIAS')
+                keyPassword project.property('VIRTUALDOORMAN_RELEASE_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
+        release {
+            // Unsigned unless the release keystore properties are present; the
+            // check below fails the build rather than shipping a debug-signed
+            // APK that can never be updated in place.
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled enableProguardInReleaseBuilds
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+        }
+    }
+    // No ABI splits and no app bundle: we ship one universal APK to sideload.
+    splits {
+        abi {
+            enable false
+            universalApk true
+        }
+    }
+}
+
+def releaseTaskPrefixes = ["assemble", "bundle", "install", "package"]
+if (!hasReleaseSigning) {
+    tasks.matching { task ->
+            task.name.endsWith("Release") && releaseTaskPrefixes.any { task.name.startsWith(it) }
+        }
+        .configureEach {
+            doFirst {
+                throw new GradleException(
+                    "Release signing is not configured. Set ${releaseSigningProps.join(', ')} " +
+                    "in ~/.gradle/gradle.properties (see README, \"Release APK\").")
+            }
+        }
+}
+
+dependencies {
+    // The version of react-native is set by the React Native Gradle Plugin
+    implementation("com.facebook.react:react-android")
+
+    if (hermesEnabled.toBoolean()) {
+        implementation("com.facebook.react:hermes-android")
+    } else {
+        implementation jscFlavor
+    }
+}

@@ -1,0 +1,10 @@
+{
+  "app": {
+    "title": "Virtual Doorman"
+  },
+  "welcome": {
+    "heading": "Welcome",
+    "subtitle": "This tablet is not paired to a property yet.",
+    "environment": "Environment: {{envName}}"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "app": {
+    "title": "Portero Virtual"
+  },
+  "welcome": {
+    "heading": "Bienvenido",
+    "subtitle": "Esta tableta aún no está vinculada a una propiedad.",
+    "environment": "Entorno: {{envName}}"
+  }
+}

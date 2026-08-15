@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    // `lib` is deliberately not set: workspaces that extend
+    // @react-native/typescript-config as well keep its curated, Hermes-shaped
+    // lib list, and everything else derives it from `target`.
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    // Automatic JSX runtime, matching @react-native/babel-preset.
+    "jsx": "react-jsx",
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+
+    // Paths are relative to this file (no `baseUrl`: deprecated in TS 6).
+    "paths": {
+      "@virtualdoorman/types": ["./packages/types/src/index.ts"],
+      "@virtualdoorman/types/*": ["./packages/types/src/*"]
+    }
+  },
+  "exclude": ["**/node_modules", "**/android", "**/build"]
+}

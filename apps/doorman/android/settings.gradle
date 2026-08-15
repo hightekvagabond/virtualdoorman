@@ -1,0 +1,28 @@
+// Monorepo layout: dependencies are hoisted to the workspace root, so
+// node_modules normally lives three levels up (apps/doorman/android → repo
+// root). The app-local folder is checked first in case Yarn had to nest a
+// copy. `gradle.ext.nodeModulesDir` is reused by app/build.gradle.
+//
+// Everything is resolved inside `pluginManagement` because Gradle requires
+// that block to come before any other statement in a settings file.
+pluginManagement {
+    def nodeModulesDir = [
+        new File(settingsDir, "../node_modules"),
+        new File(settingsDir, "../../../node_modules"),
+    ].find { new File(it, "react-native/package.json").exists() }
+
+    if (nodeModulesDir == null) {
+        throw new GradleException(
+            "Could not find a node_modules directory containing react-native. " +
+            "Run `yarn install` at the repo root before building.")
+    }
+
+    gradle.ext.nodeModulesDir = nodeModulesDir.canonicalFile
+    includeBuild(new File(gradle.ext.nodeModulesDir, "@react-native/gradle-plugin"))
+}
+
+plugins { id("com.facebook.react.settings") }
+extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
+rootProject.name = 'virtualdoorman'
+include ':app'
+includeBuild(new File(gradle.ext.nodeModulesDir, "@react-native/gradle-plugin"))

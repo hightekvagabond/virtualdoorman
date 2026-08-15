@@ -1,0 +1,8 @@
+node_modules/
+.yarn/
+coverage/
+apps/*/android/
+yarn.lock
+
+# Approved planning docs are kept verbatim.
+plans/
