@@ -26,9 +26,13 @@
     "noUnusedParameters": true,
 
     // Paths are relative to this file (no `baseUrl`: deprecated in TS 6).
+    //
+    // The barrel is the only entry point on purpose. A `@virtualdoorman/types/*`
+    // subpath alias would typecheck here but fail in Metro and Jest, which
+    // resolve the package through `main` — i.e. it would break at bundle time,
+    // after lint and typecheck are already green.
     "paths": {
-      "@virtualdoorman/types": ["./packages/types/src/index.ts"],
-      "@virtualdoorman/types/*": ["./packages/types/src/*"]
+      "@virtualdoorman/types": ["./packages/types/src/index.ts"]
     }
   },
   "exclude": ["**/node_modules", "**/android", "**/build"]

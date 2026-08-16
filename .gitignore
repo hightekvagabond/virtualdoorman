@@ -19,9 +19,13 @@ yarn-error.log*
 apps/*/android/app/build/
 apps/*/android/build/
 apps/*/android/.gradle/
-apps/*/android/.cxx/
 apps/*/android/local.properties
 *.jsbundle
+# Unanchored, like the RN template: AGP/CMake and the Kotlin plugin stage these
+# under android/app/, not just android/.
+.cxx/
+.kotlin/
+*.hprof
 
 # Signing material — release keystores never live in the repo (see README)
 *.keystore

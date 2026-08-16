@@ -14,17 +14,19 @@ import type { Property } from '@virtualdoorman/types';
 import './i18n';
 import { env } from './config/env';
 
-// FUTURE: pairing writes the real property here; until then the scaffold
-// shows a placeholder so the shared type is exercised at compile time.
-const UNPAIRED_PROPERTY: Property = {
-  name: 'unpaired',
-  display_name: 'Unpaired device',
-  bucket: '',
-  prefix: '',
-};
-
 function App(): React.JSX.Element {
   const { t } = useTranslation();
+
+  // FUTURE: pairing writes the real property here; until then the scaffold
+  // shows a placeholder so the shared type is exercised at compile time.
+  // `display_name` comes from `t()` because this is app-owned chrome; once
+  // paired it is property data and no longer an i18n key.
+  const unpairedProperty: Property = {
+    name: 'unpaired',
+    display_name: t('property.unpaired'),
+    bucket: '',
+    prefix: '',
+  };
 
   // FUTURE: role-based entry branches here — a paired client device boots into
   // the kiosk capture flow, a master device into the admin app (pairing ticket).
@@ -38,7 +40,7 @@ function App(): React.JSX.Element {
           <Text style={styles.meta}>
             {t('welcome.environment', { envName: env.ENV_NAME })}
           </Text>
-          <Text style={styles.meta}>{UNPAIRED_PROPERTY.display_name}</Text>
+          <Text style={styles.meta}>{unpairedProperty.display_name}</Text>
         </View>
       </SafeAreaView>
     </SafeAreaProvider>

@@ -44,13 +44,13 @@ yarn android          # build a debug APK and install it on the connected device
 yarn start            # Metro, if you need it standalone
 ```
 
-Quality gates — the same three CI runs on every PR:
+Quality gates — the first three are what CI runs on every PR:
 
 ```bash
 yarn lint             # ESLint + Prettier --check, repo-wide
 yarn typecheck        # tsc --noEmit in every workspace
-yarn test             # Jest (apps/doorman)
-yarn format           # rewrite files to Prettier style
+yarn test             # Jest (apps/doorman) + tsc (packages/types)
+yarn format           # not a gate: rewrites files to Prettier style
 ```
 
 ## Environments
@@ -62,10 +62,26 @@ yarn format           # rewrite files to Prettier style
 | `debug`    | `apps/doorman/.env.development` |
 | `release`  | `apps/doorman/.env.production`  |
 
-Both files are committed and hold **non-secret defaults only**. Machine-local
-overrides go in `.env.local` (gitignored). No AWS credentials live here — a
-tablet receives those through QR pairing and stores them in the Android
-Keystore.
+Both files are committed and hold **non-secret defaults only**. No AWS
+credentials live here — a tablet receives those through QR pairing and stores
+them in the Android Keystore.
+
+To build against a machine-local file instead (e.g. a gitignored `.env.local`),
+set `ENVFILE`, which takes precedence over the table above:
+
+```bash
+ENVFILE=.env.local yarn android
+```
+
+The path is resolved relative to `apps/doorman/`, and the file _replaces_ rather
+than merges with the one in the table, so it must define every key
+`src/config/env.ts` validates. A file missing keys fails the Gradle build
+outright — `app/build.gradle` checks before packaging, so a half-configured APK
+never reaches a tablet.
+
+**Build one variant per Gradle invocation.** The file is chosen from the task
+name, and only the first recognisable one counts: `./gradlew assembleDebug
+assembleRelease` would give _both_ APKs the development environment.
 
 Read values through `src/config/env.ts`, never from `react-native-config`
 directly: the accessor validates keys at startup so a bad build fails loudly.
@@ -123,14 +139,21 @@ One universal APK is produced (no ABI splits, no app bundle).
   `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` and friends; every
   workspace extends it.
 - **All app-owned copy goes through `t()`** with keys in
-  `apps/doorman/src/i18n/locales/{en,es}.json`. Both catalogues must carry the
-  same keys — a test enforces it. The device locale picks the language
-  (`en` fallback).
+  `apps/doorman/src/i18n/locales/{en,es}.json`. Tests enforce that both
+  catalogues carry the same keys _and_ that no Spanish string is left as its
+  English original. The device locale picks the language (`en` fallback).
+- **Import `@virtualdoorman/types` through the barrel**, never a subpath. Metro
+  and Jest resolve the package through its `main`, so a deep import would
+  typecheck and then fail at bundle time.
 - **Admin-editable copy is not i18n.** Screensaver text, thank-you text and
   form labels come from `config.json` and are modelled in
   `@virtualdoorman/types`.
 - **Not-yet-implemented integration points** are marked with a `// FUTURE:`
   comment rather than half-built code.
+- **Every workspace defines `typecheck` and `test`.** The root scripts fan out
+  with `yarn workspaces foreach`, which skips — silently, without failing — any
+  workspace missing the script. A new workspace without both would get a green
+  CI run covering nothing.
 
 ## CI
 

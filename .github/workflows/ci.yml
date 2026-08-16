@@ -5,6 +5,11 @@ on:
   push:
     branches: [dev]
 
+# `yarn install` runs dependency lifecycle scripts on pull_request, so the job
+# gets the narrowest token it can do its work with.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true

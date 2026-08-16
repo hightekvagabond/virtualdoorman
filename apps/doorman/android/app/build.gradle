@@ -5,16 +5,40 @@ apply plugin: "com.facebook.react"
 // Resolved in settings.gradle: the node_modules folder that actually holds
 // react-native (the workspace root's, once Yarn hoists it).
 def nodeModulesDir = gradle.ext.nodeModulesDir
+def isWindows = System.getProperty("os.name").toLowerCase().contains("windows")
 
 /**
  * Maps build types to the `.env` files react-native-config bakes into the APK.
  * Must be set before dotenv.gradle is applied.
+ *
+ * dotenv.gradle picks the file from the *task name* (`assembleRelease` →
+ * `release`). Invocations it cannot classify — `./gradlew build`, an IDE sync —
+ * fall through to `defaultEnvFile`; without one it would look for a `.env` that
+ * does not exist here and bake in nothing, producing an APK that crashes on
+ * launch in `src/config/env.ts`. Development is the right default for those:
+ * `assembleRelease`/`bundleRelease` always classify correctly.
+ *
+ * Build one variant at a time: dotenv reads the first task name it can
+ * classify, so `./gradlew assembleDebug assembleRelease` would give both APKs
+ * the development environment.
  */
+project.ext.defaultEnvFile = ".env.development"
 project.ext.envConfigFiles = [
     debug: ".env.development",
     release: ".env.production",
 ]
 apply from: new File(nodeModulesDir, "react-native-config/android/dotenv.gradle")
+
+// Belt and braces: a malformed or truncated .env file otherwise surfaces only
+// as a crash on the tablet, long after a green build.
+def requiredEnvKeys = ["ENV_NAME", "LOG_LEVEL"]
+def missingEnvKeys = requiredEnvKeys.findAll { !project.env.containsKey(it) }
+if (!missingEnvKeys.isEmpty()) {
+    throw new GradleException(
+        "Environment file is missing required keys: ${missingEnvKeys.join(', ')}. " +
+        "Check apps/doorman/.env.development and .env.production against " +
+        "apps/doorman/src/config/env.ts.")
+}
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -31,6 +55,15 @@ react {
     codegenDir = new File(nodeModulesDir, "@react-native/codegen")
     //   The cli.js file which is the React Native CLI entrypoint.
     cliFile = new File(nodeModulesDir, "react-native/cli.js")
+
+    /* Hermes Commands */
+    //   The Hermes compiler used to build the release JS bundle. Without this
+    //   the plugin looks for it under `root`/node_modules (i.e. apps/doorman),
+    //   which does not exist once Yarn hoists everything to the repo root, and
+    //   `assembleRelease` fails with "Couldn't determine Hermesc location".
+    //   `%OS-BIN%` is substituted by the plugin; the binary name is not.
+    def hermescBin = isWindows ? "hermesc.exe" : "hermesc"
+    hermesCommand = new File(nodeModulesDir, "hermes-compiler/hermesc/%OS-BIN%/${hermescBin}").toString()
 
     /* Autolinking */
     autolinkLibrariesWithApp()
@@ -116,11 +149,14 @@ android {
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
     }
-    // No ABI splits and no app bundle: we ship one universal APK to sideload.
+    // One APK to sideload, carrying every ABI in `reactNativeArchitectures`
+    // (gradle.properties). Splits are off by default; stated explicitly so a
+    // later per-ABI optimisation is a deliberate change, not a drift.
+    // `universalApk` is intentionally absent — it only applies when splits are
+    // enabled, so setting it here would just be decoration.
     splits {
         abi {
             enable false
-            universalApk true
         }
     }
 }

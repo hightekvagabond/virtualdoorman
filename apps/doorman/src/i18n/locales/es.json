@@ -6,5 +6,8 @@
     "heading": "Bienvenido",
     "subtitle": "Esta tableta aún no está vinculada a una propiedad.",
     "environment": "Entorno: {{envName}}"
+  },
+  "property": {
+    "unpaired": "Dispositivo sin vincular"
   }
 }

@@ -18,28 +18,43 @@ const findBestLanguageTagMock = findBestLanguageTag as jest.MockedFunction<
   typeof findBestLanguageTag
 >;
 
-/** Flattens `{a: {b: 'x'}}` to `['a.b']`. */
-function keyPaths(value: unknown, prefix = ''): string[] {
+/** Flattens `{a: {b: 'x'}}` to `[['a.b', 'x']]`. */
+function leaves(value: unknown, prefix = ''): [string, string][] {
   if (typeof value !== 'object' || value === null) {
-    return [prefix];
+    return [[prefix, String(value)]];
   }
 
   return Object.entries(value).flatMap(([key, child]) =>
-    keyPaths(child, prefix === '' ? key : `${prefix}.${key}`),
+    leaves(child, prefix === '' ? key : `${prefix}.${key}`),
   );
 }
 
+/**
+ * Key paths whose Spanish text is legitimately identical to the English.
+ * Empty today; add a key here (with a reason) rather than weakening the check.
+ */
+const IDENTICAL_ACROSS_LOCALES: readonly string[] = [];
+
 describe('locale catalogues', () => {
   it('ship the same keys in every language', () => {
-    const enKeys = keyPaths(en).sort();
-    const esKeys = keyPaths(es).sort();
+    const enKeys = leaves(en)
+      .map(([key]) => key)
+      .sort();
+    const esKeys = leaves(es)
+      .map(([key]) => key)
+      .sort();
 
     expect(esKeys).toEqual(enKeys);
   });
 
   it('leave no string untranslated between en and es', () => {
-    expect(es.app.title).not.toBe(en.app.title);
-    expect(es.welcome.heading).not.toBe(en.welcome.heading);
+    const esByKey = new Map(leaves(es));
+    const untranslated = leaves(en)
+      .filter(([key]) => !IDENTICAL_ACROSS_LOCALES.includes(key))
+      .filter(([key, enText]) => esByKey.get(key) === enText)
+      .map(([key]) => key);
+
+    expect(untranslated).toEqual([]);
   });
 });
 
@@ -57,8 +72,27 @@ describe('detectLanguage', () => {
     expect(detectLanguage()).toBe(tag);
   });
 
+  it('offers exactly the locales we ship to the matcher', () => {
+    detectLanguage();
+
+    // Without this the stubbed return value above would also satisfy an
+    // implementation that asked for the wrong set of languages.
+    expect(findBestLanguageTagMock).toHaveBeenCalledWith(['en', 'es']);
+  });
+
   it('falls back to English when the device locale is unsupported', () => {
     findBestLanguageTagMock.mockReturnValueOnce(undefined);
+
+    expect(detectLanguage()).toBe(FALLBACK_LANGUAGE);
+  });
+
+  it('falls back to English for a tag outside the shipped set', () => {
+    // react-native-localize only ever returns a member of the array it was
+    // given, but the guard has to hold if that contract is ever broken.
+    findBestLanguageTagMock.mockReturnValueOnce({
+      languageTag: 'fr' as 'en',
+      isRTL: false,
+    });
 
     expect(detectLanguage()).toBe(FALLBACK_LANGUAGE);
   });

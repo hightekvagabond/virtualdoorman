@@ -10,7 +10,7 @@
   "scripts": {
     "android": "yarn workspace @virtualdoorman/app android",
     "start": "yarn workspace @virtualdoorman/app start",
-    "lint": "eslint . && prettier --check .",
+    "lint": "eslint . --max-warnings 0 && prettier --check .",
     "format": "prettier --write .",
     "typecheck": "yarn workspaces foreach --all --topological --exclude virtualdoorman --verbose run typecheck",
     "test": "yarn workspaces foreach --all --topological --exclude virtualdoorman --verbose run test"
@@ -23,6 +23,7 @@
     "typescript": "^6.0.3"
   },
   "engines": {
-    "node": ">=22.11.0"
+    "node": "^22.13.0 || ^24.3.0 || >=26.0.0",
+    "yarn": ">=4.0.0"
   }
 }
