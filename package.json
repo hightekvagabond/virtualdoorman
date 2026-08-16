@@ -12,8 +12,8 @@
     "start": "yarn workspace @virtualdoorman/app start",
     "lint": "eslint . --max-warnings 0 && prettier --check .",
     "format": "prettier --write .",
-    "typecheck": "yarn workspaces foreach --all --topological --exclude virtualdoorman --verbose run typecheck",
-    "test": "yarn workspaces foreach --all --topological --exclude virtualdoorman --verbose run test"
+    "typecheck": "yarn workspaces foreach --all --topological --exclude virtualdoorman --verbose exec yarn run typecheck",
+    "test": "yarn workspaces foreach --all --topological --exclude virtualdoorman --verbose exec yarn run test"
   },
   "devDependencies": {
     "@react-native/eslint-config": "0.87.0",

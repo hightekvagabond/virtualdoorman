@@ -2,12 +2,16 @@
  * Repo-wide ESLint config. One config for every workspace so `yarn lint`
  * (run from the repo root) covers apps/* and packages/* alike.
  *
- * `@react-native` already extends eslint-config-prettier, so ESLint stays out
- * of formatting; `prettier --check` (part of `yarn lint`) owns that.
+ * `prettier` (eslint-config-prettier) is listed last so ESLint stays out of
+ * formatting entirely; `prettier --check` (part of `yarn lint`) owns that.
+ * `@react-native` extends it too, but only the copy pinned in its own
+ * dependency range — naming it here makes the root devDependency the one that
+ * actually applies, and keeps the guarantee if that transitive extend is ever
+ * dropped.
  */
 module.exports = {
   root: true,
-  extends: ['@react-native'],
+  extends: ['@react-native', 'prettier'],
   ignorePatterns: [
     'node_modules/',
     '.yarn/',

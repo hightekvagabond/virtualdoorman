@@ -150,10 +150,13 @@ One universal APK is produced (no ABI splits, no app bundle).
   `@virtualdoorman/types`.
 - **Not-yet-implemented integration points** are marked with a `// FUTURE:`
   comment rather than half-built code.
-- **Every workspace defines `typecheck` and `test`.** The root scripts fan out
-  with `yarn workspaces foreach`, which skips — silently, without failing — any
-  workspace missing the script. A new workspace without both would get a green
-  CI run covering nothing.
+- **Every workspace defines `typecheck` and `test`.** This is enforced, not
+  just documented: the root scripts fan out with `foreach … exec yarn run <x>`
+  rather than `foreach … run <x>`, because the latter skips — silently, without
+  failing — any workspace missing the script, so a new workspace without both
+  would get a green CI run covering nothing. With `exec`, the missing script is
+  a hard error. A workspace with nothing to run says so explicitly (see
+  `packages/types`, whose `test` is its typecheck).
 
 ## CI
 
