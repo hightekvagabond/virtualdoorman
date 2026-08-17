@@ -27,10 +27,11 @@
 
     // Paths are relative to this file (no `baseUrl`: deprecated in TS 6).
     //
-    // The barrel is the only entry point on purpose. A `@virtualdoorman/types/*`
-    // subpath alias would typecheck here but fail in Metro and Jest, which
-    // resolve the package through `main` — i.e. it would break at bundle time,
-    // after lint and typecheck are already green.
+    // The barrel is the only entry point on purpose, and that is enforced by
+    // the `exports` field in packages/types/package.json rather than by this
+    // alias: a subpath such as `@virtualdoorman/types/src/entry` resolves
+    // straight through the workspace symlink otherwise, so it would compile and
+    // bundle happily and the convention would live in prose alone.
     "paths": {
       "@virtualdoorman/types": ["./packages/types/src/index.ts"]
     }

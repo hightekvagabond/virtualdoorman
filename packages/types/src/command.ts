@@ -57,6 +57,12 @@ export interface CommandAck {
   status: CommandAckStatus;
   /** ISO-8601 UTC instant the device finished handling the command. */
   acknowledged_at_utc: string;
-  /** Failure detail; present only when `status` is `'failed'`. */
-  error?: string;
+  /**
+   * Failure detail; present only when `status` is `'failed'`.
+   *
+   * Explicitly `| undefined` because the repo runs `exactOptionalPropertyTypes`:
+   * without it, the natural `error: err?.message` assignment is a type error
+   * and the next ticket would be tempted to relax the compiler flag instead.
+   */
+  error?: string | undefined;
 }

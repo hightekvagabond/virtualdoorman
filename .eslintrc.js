@@ -17,7 +17,11 @@ module.exports = {
     '.yarn/',
     'coverage/',
     'apps/*/android/',
-    '**/*.d.ts',
+    // ESLint 8 skips every dot-prefixed file when it walks a directory, so
+    // `eslint .` silently reported success on `.prettierrc.js` and would do the
+    // same for any `.babelrc.js`/`.*.js` added later. Re-include them; the
+    // directory ignores above still win for anything inside `.yarn/`.
+    '!.*.js',
   ],
   overrides: [
     {

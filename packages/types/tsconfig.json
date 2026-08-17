@@ -1,4 +1,23 @@
 {
   "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // This package is pure interfaces shared with a Hermes-only app, so it must
+    // not typecheck against globals that do not exist there. Two separate leaks
+    // to close:
+    //   `lib` — the app inherits @react-native/typescript-config's Hermes-shaped
+    //   list, but this package extends only the base, where `target: esnext`
+    //   alone resolves to lib.esnext.full, DOM included.
+    //   `types` — left unset, TypeScript auto-includes every @types/* hoisted to
+    //   the repo root, so @types/react (which declares HTMLDivElement and
+    //   friends in its global.d.ts), @types/node and @types/jest would all be
+    //   ambient here. This package needs none of them.
+    //   `jsx` — the base sets `react-jsx` for the app, which makes TypeScript
+    //   auto-import the JSX runtime's types, dragging @types/react (and the DOM
+    //   globals in its global.d.ts) back in even with `types: []`. There is no
+    //   JSX in this package.
+    "lib": ["esnext"],
+    "types": [],
+    "jsx": "preserve"
+  },
   "include": ["src/**/*.ts"]
 }

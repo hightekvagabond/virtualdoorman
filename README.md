@@ -30,9 +30,13 @@ edit in `packages/types` is visible to the app immediately.
 
 ## Prerequisites
 
-- **Node** — the version in [`.nvmrc`](.nvmrc) (`nvm use`).
-- **Yarn 4** — provided by Corepack, pinned by `packageManager` in
-  `package.json`: run `corepack enable` once.
+- **Node** — the version in [`.nvmrc`](.nvmrc) (`nvm use`). `engines.node`
+  mirrors React Native 0.87's own supported range, which is wider than that.
+- **Yarn 4** — pinned by `packageManager` in `package.json`. On the `.nvmrc`
+  version (Node 24) run `corepack enable` once. Node 25 stopped shipping
+  Corepack ([nodejs/node#57617](https://github.com/nodejs/node/pull/57617)), so
+  on Node 25+ install it directly instead: `npm install -g yarn@4.18.0`. CI
+  installs Node from `.nvmrc`, so its `corepack enable` step is unaffected.
 - **JDK 17** and the **Android SDK** (platform + build tools per
   `apps/doorman/android/build.gradle`), with `adb` on your `PATH`.
 
@@ -142,9 +146,11 @@ One universal APK is produced (no ABI splits, no app bundle).
   `apps/doorman/src/i18n/locales/{en,es}.json`. Tests enforce that both
   catalogues carry the same keys _and_ that no Spanish string is left as its
   English original. The device locale picks the language (`en` fallback).
-- **Import `@virtualdoorman/types` through the barrel**, never a subpath. Metro
-  and Jest resolve the package through its `main`, so a deep import would
-  typecheck and then fail at bundle time.
+- **Import `@virtualdoorman/types` through the barrel**, never a subpath. This
+  is enforced, not just asked for: `packages/types/package.json` declares an
+  `exports` map with a single `"."` entry, so `@virtualdoorman/types/src/entry`
+  fails `yarn typecheck` (`TS2307`). Without it the workspace symlink would
+  resolve any deep path and the barrel would be a convention nobody checks.
 - **Admin-editable copy is not i18n.** Screensaver text, thank-you text and
   form labels come from `config.json` and are modelled in
   `@virtualdoorman/types`.

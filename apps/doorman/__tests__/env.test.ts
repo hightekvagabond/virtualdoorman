@@ -31,6 +31,19 @@ function readEnvFile(fileName: string): RawEnv {
   return parsed;
 }
 
+/**
+ * A valid environment, per key, plus a value that is not in that key's allowed
+ * set. Every key is driven through the same cases: checking only `ENV_NAME`
+ * would leave `LOG_LEVEL`'s validation free to be deleted with a green gate,
+ * since `ENV_NAME` is evaluated first and throws before `LOG_LEVEL` is read.
+ */
+const VALID_ENV = { ENV_NAME: 'development', LOG_LEVEL: 'debug' } as const;
+
+const KEY_CASES = [
+  ['ENV_NAME', 'staging', 'development, production'],
+  ['LOG_LEVEL', 'trace', 'debug, info, warn, error'],
+] as const;
+
 describe('parseEnv', () => {
   it('accepts a well-formed environment', () => {
     expect(parseEnv({ ENV_NAME: 'production', LOG_LEVEL: 'warn' })).toEqual({
@@ -39,17 +52,31 @@ describe('parseEnv', () => {
     });
   });
 
-  it('throws when a key is missing or empty', () => {
-    expect(() => parseEnv({ LOG_LEVEL: 'warn' })).toThrow(/ENV_NAME/);
-    expect(() => parseEnv({ ENV_NAME: '', LOG_LEVEL: 'warn' })).toThrow(
-      /ENV_NAME/,
-    );
-  });
+  describe.each(KEY_CASES)('%s', (key, badValue, allowed) => {
+    it('throws when the key is absent', () => {
+      const { [key]: _absent, ...rest } = VALID_ENV;
 
-  it('throws when a key is outside the allowed values', () => {
-    expect(() => parseEnv({ ENV_NAME: 'staging', LOG_LEVEL: 'warn' })).toThrow(
-      /expected one of development, production/,
-    );
+      // The message has to say *which* failure it is: matching only the key
+      // name would let the missing-key branch be deleted, since an absent key
+      // also trips the allowed-values branch.
+      expect(() => parseEnv(rest)).toThrow(
+        new RegExp(`Missing environment key "${key}"`),
+      );
+    });
+
+    it('throws when the key is empty', () => {
+      expect(() => parseEnv({ ...VALID_ENV, [key]: '' })).toThrow(
+        new RegExp(`Missing environment key "${key}"`),
+      );
+    });
+
+    it('throws when the key is outside the allowed values', () => {
+      expect(() => parseEnv({ ...VALID_ENV, [key]: badValue })).toThrow(
+        new RegExp(
+          `Invalid environment key "${key}": expected one of ${allowed}, got "${badValue}"`,
+        ),
+      );
+    });
   });
 
   it('exposes the values baked into this build', () => {
