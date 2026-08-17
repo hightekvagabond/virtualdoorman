@@ -1,0 +1,10 @@
+{
+  "extends": ["@react-native/typescript-config", "../../tsconfig.base.json"],
+  "compilerOptions": {
+    // `node` is here for the Jest suites only (they read the committed .env
+    // files off disk). App code runs on Hermes: no Node built-ins in `src/`.
+    "types": ["jest", "node"]
+  },
+  "include": ["index.js", "src/**/*", "__tests__/**/*", "jest.setup.js"],
+  "exclude": ["node_modules", "android"]
+}

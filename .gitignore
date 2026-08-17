@@ -1,0 +1,46 @@
+# Node
+node_modules/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Yarn (Yarn 4, node-modules linker, no zero-installs)
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+
+# Metro / React Native
+.metro-health-check*
+apps/*/android/app/build/
+apps/*/android/build/
+apps/*/android/.gradle/
+apps/*/android/local.properties
+*.jsbundle
+# Unanchored, like the RN template: AGP/CMake and the Kotlin plugin stage these
+# under android/app/, not just android/.
+.cxx/
+.kotlin/
+*.hprof
+
+# Signing material — release keystores never live in the repo (see README)
+*.keystore
+!apps/doorman/android/app/debug.keystore
+*.jks
+keystore.properties
+
+# Environment overrides with secrets
+.env.local
+.env.*.local
+
+# Tooling caches / editors
+coverage/
+.eslintcache
+.DS_Store
+*.swp
+.idea/
+.vscode/
