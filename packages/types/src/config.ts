@@ -45,9 +45,30 @@ export interface Config {
   form_fields: FormFieldConfig[];
   /** How often the tablet polls for config/commands. Default: 20. */
   poll_interval_minutes: number;
+  /**
+   * Seconds of no touch input before the screensaver activates. Default: 30.
+   * Hot-applies without app restart when config syncs.
+   */
+  screen_timeout_seconds: number;
+  /**
+   * Screen brightness while the app is running, 0.0–1.0. Default: 0.8.
+   * Applied on launch and after every config sync.
+   */
+  screen_brightness: number;
   notifications: NotificationsConfig;
   /** Minimum {@link Entry.cv_confidence} to accept a capture without a retry prompt, 0..1. */
   cv_confidence_threshold: number;
   // FUTURE: booking-system integration (provider + credentials reference).
   booking_system: null;
 }
+
+/**
+ * Default values for fields added after schema_version 1 launch, and for
+ * tablet-side fallback when config.json has not yet been fetched from S3.
+ */
+export const CONFIG_DEFAULTS = {
+  screen_timeout_seconds: 30,
+  screen_brightness: 0.8,
+  poll_interval_minutes: 20,
+  cv_confidence_threshold: 0.75,
+} as const;
